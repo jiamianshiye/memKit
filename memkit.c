@@ -302,6 +302,7 @@ int mk_realloc(struct MemPacket *pkt ,struct MemKitHandle *handle)
         pBlk = list_entry(pos, struct MemKitBlock, list); 
         list_del(&pBlk->list);
         list_add_tail(&pBlk->list, &pkt->blks_list);
+        INFO("addr for entry:%p!\n", pBlk->blk_entry);
         pkt->blk_nums++;
         if(len > handle->handle_block_size)
         {
@@ -393,14 +394,15 @@ void *mk_next_entry(struct MemItorVec *pItor)
         WARN("No free blocks to be Itor , blk num:%d!\n", pItor->blk_num);
         goto EXIT;
     }
-    plist = pItor->plist;
+    //
+    plist = pItor->plist->next;
 
     pblk = list_entry(plist, struct MemKitBlock, list);
+    INFO("pblk:%p\n", pblk);
     pItor->entry = pblk->blk_entry;
     pItor->blk_length = pblk->blk_length;
-    //change plist point to next list.
-    pItor->plist = plist->next;
     pItor->blk_idx++;
+    pItor->plist = plist;
 
     return pItor->entry;
 

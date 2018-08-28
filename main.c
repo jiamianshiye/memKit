@@ -30,6 +30,7 @@ int main(int argc, char *argv[])
         ptr = mk_next_entry(&itor);
         if(ptr)
         {
+            printf("ptr:%p\n", ptr);
             sprintf(ptr, "test str %d\n", i);
             i++;
         }
@@ -38,7 +39,24 @@ int main(int argc, char *argv[])
             break;
         }
     }
+    INFO("echo in over i:%d\n", i);
 
+    mk_set_itor(packet, &itor);
+    i = 0;
+    while(1)
+    {
+        ptr = mk_next_entry(&itor);
+        if(ptr)
+        {
+            printf("ptr:%s, %p\n", ptr, ptr);
+            i++;
+        }
+        else
+        {
+            break;
+        }        
+    }
+    INFO("cout out over i:%d\n", i);
     mk_free(packet);
 
 
