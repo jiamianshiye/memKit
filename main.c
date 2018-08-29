@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     mk_print_handle_info(&hdl);
 
     struct MemPacket *packet = NULL;
-
+///////////////////////////////////////////////////
     packet = mk_malloc(&hdl, 3890, "Chengdapeng");
 
     mk_print_pkt_info(packet);
@@ -57,6 +57,14 @@ int main(int argc, char *argv[])
         }        
     }
     INFO("cout out over i:%d\n", i);
+    INFO("//////////////////////////////////////////////////\n");
+    mk_realloc(packet, 100);
+    mk_print_pkt_info(packet);
+    mk_realloc(packet, 289013);
+    mk_print_pkt_info(packet);
+    mk_realloc(packet, 1025);
+    mk_print_pkt_info(packet);
+
     mk_free(packet);
 
 

@@ -76,7 +76,7 @@ struct MemPacket
     struct list_head    list;
     int                 magic_head;
     int                 total_size;
-    int                 blk_nums;
+    int                 blk_num;
     int                 mem_refs;       //refernce  numbers . 引用计数.
     struct list_head    blks_list;
     char                pkt_name[8];    //

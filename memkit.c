@@ -85,7 +85,7 @@ int mk_print_pkt_info(struct MemPacket *pkt)
     }
 
     INFO("Infomation for pkt >>>>>\n")
-    INFO("pkt total_size:%d, blk_nums:%d, name:%s, blk_size:%d\n", pkt->total_size, pkt->blk_nums, pkt->pkt_name, pkt->handle->handle_block_size);
+    INFO("pkt total_size:%d, blk_num:%d, name:%s, blk_size:%d\n", pkt->total_size, pkt->blk_num, pkt->pkt_name, pkt->handle->handle_block_size);
     INFO("Actually infomation is >>>>>\n");
     pthread_mutex_lock(&pkt->handle->handle_mtx);
     list_for_each_prev_safe(pos, next, &pkt->blks_list)
@@ -93,7 +93,7 @@ int mk_print_pkt_info(struct MemPacket *pkt)
         count++;
     }
     pthread_mutex_unlock(&pkt->handle->handle_mtx);
-    INFO("pkt calc block count is : %d\n", count);
+    INFO("pkt calc block count is : %d, total_size:%d\n", count, pkt->total_size);
 
     return 0;
 EXIT:
@@ -185,7 +185,7 @@ int mk_handle_init(struct MemKitHandle *handle, unsigned int mm_blocks, unsigned
         }
         pkt = (struct MemPacket *)ptr;
         pkt->magic_head = MEM_PACKET_MAGIC;
-        pkt->blk_nums = 0;
+        pkt->blk_num = 0;
         pkt->handle = handle;
         list_add_tail(&pkt->list, &handle->handle_pkt_list);
         ptr += pkt_full_size;
@@ -204,6 +204,11 @@ EXIT:
         p = NULL;
     }
     return ret;
+}
+
+int mk_handle_deinit(struct MemKitHandle *handle)
+{
+
 }
 
 /**
@@ -252,6 +257,7 @@ struct MemPacket * mk_malloc(struct MemKitHandle *handle, unsigned int size, cha
     pkt->mem_refs = 1;
     pkt->handle = handle;
     pkt->total_size = 0;
+    pkt->blk_num = 0;
     strncpy(pkt->pkt_name, name == NULL ? "PI-MEM" : name, 7);
     INIT_LIST_HEAD(&pkt->blks_list);
 
@@ -279,6 +285,7 @@ int mk_realloc(struct MemPacket *pkt ,int size)
     struct list_head *pos, *next;
     struct MemKitHandle *handle = NULL;
     int len = 0;
+    int diff = 0;
 
     if(NULL == pkt || size == 0)
     {
@@ -287,14 +294,14 @@ int mk_realloc(struct MemPacket *pkt ,int size)
     }
 
     handle = pkt->handle;
-    if((handle->handle_block_size * pkt->blk_nums) >= (pkt->total_size + size))
+    //pkt->total_size += size;
+    //if((handle->handle_block_size * pkt->blk_num) >= (pkt->total_size))
+    if(size <= (handle->handle_block_size * pkt->blk_num - pkt->total_size))
     {
         INFO("Current blocks have enough memory for pkt!\n");
+        pkt->total_size += size;
         return 0;
     }
-
-    len = size;
-    pkt->total_size += size;
 
     if(pkt->magic_head != MEM_PACKET_MAGIC)
     {
@@ -302,6 +309,14 @@ int mk_realloc(struct MemPacket *pkt ,int size)
         goto EXIT;
     }
 
+    /**
+     * We need to get blocks for extra size of memory. So we must minus this last block's free memory space.
+    */
+    len = size;
+    diff = handle->handle_block_size * pkt->blk_num - pkt->total_size;
+    len -= diff;
+    pkt->total_size += diff;
+    
     //alloc blocks from handle block list.
     pthread_mutex_lock(&handle->handle_mtx);
     
@@ -317,14 +332,16 @@ int mk_realloc(struct MemPacket *pkt ,int size)
         pBlk = list_entry(pos, struct MemKitBlock, list); 
         list_del(&pBlk->list);
         list_add_tail(&pBlk->list, &pkt->blks_list);
-        INFO("addr for entry:%p!\n", pBlk->blk_entry);
-        pkt->blk_nums++;
+        //INFO("addr for entry:%p!\n", pBlk->blk_entry);
+        pkt->blk_num++;
         if(len > handle->handle_block_size)
         {
             len -= handle->handle_block_size;
+            pkt->total_size += handle->handle_block_size;
         }
         else
         {
+            pkt->total_size += len;
             len = 0;
             break;
         }
@@ -385,7 +402,7 @@ void mk_set_itor(struct MemPacket *pkt, struct MemItorVec *pItor)
 
     pItor->plist = &pkt->blks_list; 
     pItor->blk_idx = 0;
-    pItor->blk_num = pkt->blk_nums;
+    pItor->blk_num = pkt->blk_num;
 }
 
 /**
