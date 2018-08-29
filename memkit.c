@@ -251,10 +251,11 @@ struct MemPacket * mk_malloc(struct MemKitHandle *handle, unsigned int size, cha
 
     pkt->mem_refs = 1;
     pkt->handle = handle;
-    pkt->total_size = size;
+    pkt->total_size = 0;
     strncpy(pkt->pkt_name, name == NULL ? "PI-MEM" : name, 7);
+    INIT_LIST_HEAD(&pkt->blks_list);
 
-    if(mk_realloc(pkt, handle) == -1)
+    if(mk_realloc(pkt, size) == -1)
     {
         //need to free pkt and set error return value
         mk_free(pkt);
@@ -266,27 +267,41 @@ EXIT:
 }
 
 /**
+ *  mk_realloc :  get memory block from handle block list.
+ *  pkt :   packet pointer.
+ *  size   :    the memory size need to applied for.
  *  fail:-1, ok:0.
 */
-int mk_realloc(struct MemPacket *pkt ,struct MemKitHandle *handle)
+int mk_realloc(struct MemPacket *pkt ,int size)
 {
     struct MemPacket *packet = NULL;
     struct MemKitBlock *pBlk = NULL;
     struct list_head *pos, *next;
-    int len = pkt->total_size;
+    struct MemKitHandle *handle = NULL;
+    int len = 0;
 
-    if(NULL == pkt || NULL == handle)
+    if(NULL == pkt || size == 0)
     {
         ERROR("Wrong params, pkt:%p, handle:%p!\n", pkt, handle);
         goto EXIT;
     }
+
+    handle = pkt->handle;
+    if((handle->handle_block_size * pkt->blk_nums) >= (pkt->total_size + size))
+    {
+        INFO("Current blocks have enough memory for pkt!\n");
+        return 0;
+    }
+
+    len = size;
+    pkt->total_size += size;
+
     if(pkt->magic_head != MEM_PACKET_MAGIC)
     {
         ERROR("Wrong pkt magic:0x%x, handle:%p, mem_refs:%d!\n", pkt->magic_head, pkt->handle, pkt->mem_refs);
         goto EXIT;
     }
 
-    INIT_LIST_HEAD(&pkt->blks_list);
     //alloc blocks from handle block list.
     pthread_mutex_lock(&handle->handle_mtx);
     
@@ -375,18 +390,19 @@ void mk_set_itor(struct MemPacket *pkt, struct MemItorVec *pItor)
 
 /**
  *  mk_next_entry:   
- * 
- *  return val:  NULL for failed. Ok for block memory entry.
+ *  pItor  :  [IN]  itor inited by  packet , mk_set_itor
+ *  blk_len :   [OUT] put out this block lenth(memory length)
+ *  return val:  -1 for failed. 0 for ok.
 */
-void *mk_next_entry(struct MemItorVec *pItor)
+int mk_next_entry(struct MemItorVec *pItor, int *blk_len)
 {
     unsigned char *ptr = NULL;
     struct list_head *plist = NULL;
     struct MemKitBlock *pblk = NULL;
 
-    if(NULL == pItor)
+    if(NULL == pItor || NULL == blk_len)
     {
-        ERROR("Wrong params pItor:%p!\n", pItor);
+        ERROR("Wrong params pItor:%p, blk_len:%p!\n", pItor, blk_len);
         goto EXIT;
     }
     if(pItor->blk_idx == pItor->blk_num)
@@ -401,13 +417,15 @@ void *mk_next_entry(struct MemItorVec *pItor)
     INFO("pblk:%p\n", pblk);
     pItor->entry = pblk->blk_entry;
     pItor->blk_length = pblk->blk_length;
+    *blk_len = pblk->blk_length;
     pItor->blk_idx++;
+    pItor->poffset = &pblk->blk_offset;
     pItor->plist = plist;
 
-    return pItor->entry;
+    return 0;
 
 EXIT:  
-    return NULL;
+    return -1;
 }
 
 int mk_memcopy(void *out, struct MemPacket *pkt)

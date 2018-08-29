@@ -85,12 +85,12 @@ struct MemPacket
 
 struct MemItorVec
 {
-    struct list_head    *plist;
-    int                 *poffset;
+    struct list_head    *plist;     
+    int                 *poffset;       //public, offset of current block that memory used.
+    unsigned char       *entry;         //public, mem entry pointer.
     unsigned int        blk_length;     //should be equal to blk size.
-    unsigned char       *entry;         //mem entry pointer.
-    unsigned int        blk_idx;        //index for blk in packet.  include packet.  blk[0]---blk[1]---blk[2]....blk[N].
-    unsigned int        blk_num;        //total num for blks.
+    unsigned int        blk_idx;        //privite, index for blk in packet.  include packet.  blk[0]---blk[1]---blk[2]....blk[N].
+    unsigned int        blk_num;        //privite, total num for blks.
 };
 
 /**
@@ -127,7 +127,7 @@ int mk_handle_init(struct MemKitHandle *handle, unsigned int mm_blocks, unsigned
 struct MemPacket *mk_malloc(struct MemKitHandle *handle, unsigned int size, char *name);
 
 
-int mk_realloc(struct MemPacket *pkt ,struct MemKitHandle *handle);
+int mk_realloc(struct MemPacket *pkt ,int size);
 
 /**
  *  mk_free : recycle pkt mem to handle list.
@@ -138,12 +138,16 @@ int mk_free(struct MemPacket *pkt);
 
 
 void mk_set_itor(struct MemPacket *pkt, struct MemItorVec *pItor);
+
+
+
 /**
  *  mk_next_entry:   
- * 
- *  return val:  NULL for failed. Ok for block memory entry.
+ *  pItor  :  [IN]  itor inited by  packet , mk_set_itor
+ *  blk_len :   [OUT] put out this block lenth(memory length)
+ *  return val:  -1 for failed. 0 for ok.
 */
-void *mk_next_entry(struct MemItorVec *pItor);
+int mk_next_entry(struct MemItorVec *pItor, int *blk_len);
 
 #ifdef __cplusplus
 }

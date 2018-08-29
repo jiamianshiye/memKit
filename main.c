@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
 
 #include "list.h"
 #include "memkit.h"
@@ -6,7 +8,6 @@
 
 int main(int argc, char *argv[])
 {
-    printf("hello world!\n");
     struct MemKitHandle hdl;
     int block_len;
     char *ptr = NULL;
@@ -23,15 +24,15 @@ int main(int argc, char *argv[])
 
     struct MemItorVec itor;
 
+    //get mem block, start to write data to block
     mk_set_itor(packet, &itor);
     int i = 0;
     while(1)
     {
-        ptr = mk_next_entry(&itor);
-        if(ptr)
+        if(!mk_next_entry(&itor, &block_len))
         {
-            printf("ptr:%p\n", ptr);
-            sprintf(ptr, "test str %d\n", i);
+            sprintf(itor.entry, "test str %d", (int)time(NULL));
+            *itor.poffset += strlen(itor.entry); //must set offset of this block
             i++;
         }
         else
@@ -45,10 +46,9 @@ int main(int argc, char *argv[])
     i = 0;
     while(1)
     {
-        ptr = mk_next_entry(&itor);
-        if(ptr)
+        if(!mk_next_entry(&itor, &block_len))
         {
-            printf("ptr:%s, %p\n", ptr, ptr);
+            INFO("entry:%s, %p, offset:%d\n", itor.entry, itor.entry, *itor.poffset);
             i++;
         }
         else
