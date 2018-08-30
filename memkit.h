@@ -18,9 +18,8 @@ extern "C"{
 #endif
 
 #ifndef ERROR
-#define ERROR
-#define WARN(fmt, ...) \
-        printf("WARN: (%s): (line:%d) " fmt "\n", __func__, __LINE__, ##__VA_ARGS__);
+#define ERROR(fmt, ...) \
+        printf("ERROR: (%s): (line:%d) " fmt "\n", __func__, __LINE__, ##__VA_ARGS__);
 #endif
 
 #define         MEM_BLOCK_MAGIC_HEAD        (0xAA5049A0)            //default free
