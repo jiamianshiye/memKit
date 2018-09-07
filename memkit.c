@@ -445,7 +445,7 @@ EXIT:
     return -1;
 }
 
-int mk_memcopy(void *out, struct MemPacket *pkt)
+int mk_copy_out(struct MemPacket *pkt, void *out)
 {
     if(NULL == out || NULL == pkt)
     {
@@ -458,4 +458,37 @@ int mk_memcopy(void *out, struct MemPacket *pkt)
 
 EXIT:
     return -1;
+}
+
+int mk_copy_in(struct MemPacket *pkt, void *in, int in_size)
+{
+    int ret = -1;
+    int allsize = in_size;
+    int blocklen = 0;
+    int thislen = 0;
+    char *pin = (char *)in;
+
+    if(NULL == pkt || NULL == in || in_size <= 0)
+    {
+        ERROR("Wrong params  pkt:%p, in:%p, in_size:%d\n", pkt, in, in_size);
+        goto EXIT;
+    }
+    struct MemItorVec itor;
+    
+    mk_set_itor(pkt, &itor);
+
+    while( (0 == mk_next_entry(&itor, &blocklen)) && allsize > 0)
+    {
+        thislen = blocklen > allsize ? allsize : blocklen;
+        memcpy(itor.entry, pin, thislen);
+        *itor.poffset = thislen;
+        allsize -= thislen;
+        pin += thislen;
+
+    }
+
+    return 0;
+EXIT:
+
+    return ret;
 }
