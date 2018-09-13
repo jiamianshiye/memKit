@@ -19,7 +19,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
     if(handle == 0)
     {
         ERROR("Wrong mm handle:%p\n", handle);
-        goto EXIT;
+        return ;
     }
 
     int count = 0;
@@ -28,7 +28,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
     if(list_empty(&handle->handle_blk_list))
     {
         ERROR("This handle have no left mem block!\n");
-        goto EXIT;
+        return ;
     }
     else
     {
@@ -116,6 +116,8 @@ int mk_handle_init(struct MemKitHandle *handle, unsigned int mm_blocks, unsigned
     struct MemKitBlock *pBlk = NULL;
     struct MemKitTail *pBlkTail = NULL;
     int blk_full_size;
+    int pkt_full_size;
+    struct MemPacket *pkt = NULL;
 
     if(handle == NULL || (mm_block_size & mm_blocks == 0))
     {
@@ -161,8 +163,7 @@ int mk_handle_init(struct MemKitHandle *handle, unsigned int mm_blocks, unsigned
     handle->handle_blocks = mm_blocks;
 
     //init packets and add all packets to handle_pkt_list
-    struct MemPacket *pkt = NULL;
-    int pkt_full_size = sizeof(struct MemPacket) + sizeof(struct MemKitTail);
+    pkt_full_size = sizeof(struct MemPacket) + sizeof(struct MemKitTail);
     
     p = (char *)malloc(mm_blocks * pkt_full_size);  //keep packet numbers equals to block numbers.
     if(NULL == p)
@@ -436,7 +437,7 @@ int mk_next_entry(struct MemItorVec *pItor, int *blk_len)
     pItor->blk_length = pblk->blk_length;
     *blk_len = pblk->blk_length;
     pItor->blk_idx++;
-    pItor->poffset = &pblk->blk_offset;
+    pItor->poffset = (int *)&pblk->blk_offset;
     pItor->plist = plist;
 
     return 0;
@@ -445,21 +446,14 @@ EXIT:
     return -1;
 }
 
-int mk_copy_out(struct MemPacket *pkt, void *out)
-{
-    if(NULL == out || NULL == pkt)
-    {
-        ERROR("Wrong params out:%p, pkt:%p!\n", out, pkt);
-        goto EXIT;
-    }
 
-
-
-
-EXIT:
-    return -1;
-}
-
+/**
+ * mk_copy_in : copy outline memory buf to pkt.
+ * pkt : [IN], memory packet struct.
+ * in : [IN], input data pointer.
+ * in_size: [IN], input data memory size.
+ * 
+*/
 int mk_copy_in(struct MemPacket *pkt, void *in, int in_size)
 {
     int ret = -1;

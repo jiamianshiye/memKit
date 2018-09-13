@@ -31,8 +31,8 @@ int main(int argc, char *argv[])
     {
         if(!mk_next_entry(&itor, &block_len))
         {
-            sprintf(itor.entry, "test str %d", (int)time(NULL));
-            *itor.poffset += strlen(itor.entry); //must set offset of this block
+            sprintf((char *)itor.entry, "test str %d", (int)time(NULL));
+            *itor.poffset += strlen((char *)itor.entry); //must set offset of this block
             i++;
         }
         else

@@ -1,6 +1,6 @@
 all:test
 test:	main.o memkit.o
-	gcc $^ -o $@ $(LDFLAGS)
+	g++ $^ -o $@ $(LDFLAGS)
 	
 LDFLAGS+=-lpthread
 clean:
@@ -14,6 +14,7 @@ sources = *.c
 
 
 include $(sources:.c=.d)
+CC=g++
 
 %.d:%.c
 	set -e; rm -f $@; \
