@@ -45,6 +45,7 @@ struct MemKitBlock
     int                 magic_head; //block status. Default is MEM_BLOCK_MAGIC_HEAD
     unsigned int        blk_length; //total useful memory lenth of this block
     unsigned int        blk_offset; //used lenth of this block
+    unsigned int        blk_idx;    //Used for packet list index.
     unsigned char       blk_entry[0];   //memory entry of this block.  |--head--|---memory---|--tail--|
 };
 struct MemKitTail
@@ -148,6 +149,16 @@ void mk_set_itor(struct MemPacket *pkt, struct MemItorVec *pItor);
 */
 int mk_next_entry(struct MemItorVec *pItor, int *blk_len);
 
+
+
+/**
+ * mk_copy_in : copy outline memory buf to pkt.
+ * pkt : [IN], memory packet struct.
+ * in : [IN], input data pointer.
+ * in_size: [IN], input data memory size.
+ * 
+*/
+int mk_copy_in(struct MemPacket *pkt, void *in, int in_size);
 #ifdef __cplusplus
 }
 #endif

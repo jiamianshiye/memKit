@@ -24,7 +24,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
 
     int count = 0;
     struct list_head *pos, *next;
-    struct MemKitBlock *pBlk = NULL;
+    //struct MemKitBlock *pBlk = NULL;
     if(list_empty(&handle->handle_blk_list))
     {
         ERROR("This handle have no left mem block!\n");
@@ -34,13 +34,13 @@ void mk_print_handle_info(struct MemKitHandle *handle)
     {
         list_for_each_safe(pos, next, &handle->handle_blk_list)
         {
-            pBlk = list_entry(pos, struct MemKitBlock, list);
+            //pBlk = list_entry(pos, struct MemKitBlock, list);
             count++;
         }
     }
     INFO("All block count:%d, current count:%d\n", handle->handle_blocks, count);
 
-    struct MemPacket *pkt = NULL;
+    //struct MemPacket *pkt = NULL;
 
     pos = NULL;
     next = NULL;
@@ -54,7 +54,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
     {
         list_for_each_safe(pos, next, &handle->handle_pkt_list)
         {
-            pkt = list_entry(pos, struct MemPacket, list);
+            //pkt = list_entry(pos, struct MemPacket, list);
             count++;
         }
     }
@@ -119,7 +119,7 @@ int mk_handle_init(struct MemKitHandle *handle, unsigned int mm_blocks, unsigned
     int pkt_full_size;
     struct MemPacket *pkt = NULL;
 
-    if(handle == NULL || (mm_block_size & mm_blocks == 0))
+    if(handle == NULL || ((mm_block_size * mm_blocks) == 0))
     {
         WARN("Wrong parameters, pmm_list:%p, blocks:%d, block size:%d\n", handle, mm_blocks, mm_block_size);
         ret = E_MEM_INIT_FAIL;
@@ -153,7 +153,7 @@ int mk_handle_init(struct MemKitHandle *handle, unsigned int mm_blocks, unsigned
         pBlk->blk_offset = 0;
         //pBlk->blk_entry  = ptr + sizeof(struct MemKitBlock);
 
-        pBlkTail = (struct MemKitTail *)((char *)pBlk->blk_entry + mm_block_size);
+        pBlkTail = (struct MemKitTail *)((char *)pBlk->blk_entry + pBlk->blk_length);
         pBlkTail->magic_tail = MEM_BLOCK_MAGIC_TAIL;
         list_add_tail(&pBlk->list, &handle->handle_blk_list);
 
@@ -209,7 +209,28 @@ EXIT:
 
 int mk_handle_deinit(struct MemKitHandle *handle)
 {
+    return 0;
+}
 
+static int mk_magic_check(struct MemKitBlock *pBlk)
+{
+    int ret = 0;
+    struct MemKitTail *pBlkTail = NULL;
+
+    if(pBlk->magic_head != MEM_BLOCK_MAGIC_HEAD)
+    {
+        ERROR("Magic head have been damaged origin(0x%X), now(0x%X)\n", MEM_BLOCK_MAGIC_HEAD, pBlk->magic_head);
+        ret = -1;
+    }
+    
+    pBlkTail = (struct MemKitTail *)((char *)pBlk->blk_entry + pBlk->blk_length);
+    if(pBlkTail->magic_tail != MEM_BLOCK_MAGIC_TAIL)
+    {
+        ERROR("Magic tail have been damaged origin(0x%X), now(0x%X)\n", MEM_BLOCK_MAGIC_TAIL, pBlkTail->magic_tail);
+        ret = -1;
+    }
+
+    return ret;
 }
 
 /**
@@ -239,7 +260,7 @@ struct MemPacket * mk_malloc(struct MemKitHandle *handle, unsigned int size, cha
     }
     else
     {
-        INFO("Malloc from handle packe for name:%s\n", name);
+        //INFO("Malloc from handle packe for name:%s\n", name);
         list_for_each_safe(pos, next, &handle->handle_pkt_list)
         {
             pkt = list_entry(pos, struct MemPacket, list);
@@ -281,7 +302,7 @@ EXIT:
 */
 int mk_realloc(struct MemPacket *pkt ,int size)
 {
-    struct MemPacket *packet = NULL;
+    //struct MemPacket *packet = NULL;
     struct MemKitBlock *pBlk = NULL;
     struct list_head *pos, *next;
     struct MemKitHandle *handle = NULL;
@@ -327,13 +348,14 @@ int mk_realloc(struct MemPacket *pkt ,int size)
         pthread_mutex_unlock(&handle->handle_mtx);
         goto EXIT;
     }
-    INFO("Malloc from handle block for name:%s\n", pkt->pkt_name);
+    //INFO("Malloc from handle block for name:%s\n", pkt->pkt_name);
     list_for_each_safe(pos, next, &handle->handle_blk_list)
     {
         pBlk = list_entry(pos, struct MemKitBlock, list); 
         list_del(&pBlk->list);
         list_add_tail(&pBlk->list, &pkt->blks_list);
         //INFO("addr for entry:%p!\n", pBlk->blk_entry);
+        pBlk->blk_idx = pkt->blk_num;
         pkt->blk_num++;
         if(len > handle->handle_block_size)
         {
@@ -365,7 +387,7 @@ EXIT:
 */
 int mk_free(struct MemPacket *pkt)
 {
-    int ret = -1;
+    //int ret = -1;
     struct list_head *pos, *next;
     struct MemKitBlock *pBlk = NULL;
     if(NULL == pkt)
@@ -374,20 +396,24 @@ int mk_free(struct MemPacket *pkt)
         return -1;
     }
 
-    INFO("Recycle list pkt total_size:%d, name:%s!\n", pkt->total_size, pkt->pkt_name);
+    //INFO("Recycle list pkt total_size:%d, name:%s!\n", pkt->total_size, pkt->pkt_name);
     pthread_mutex_lock(&pkt->handle->handle_mtx);
     //recycle all blocks and add to handle blk list.
     list_for_each_safe(pos, next, &pkt->blks_list)
     {
         pBlk = list_entry(pos, struct MemKitBlock, list);
+        if(0 != mk_magic_check(pBlk))
+        {
+            ERROR("block damaged name:%s\n", pkt->pkt_name);
+            sleep(1);
+            exit(1);
+        }
         list_del(&pBlk->list);
         list_add_tail(&pBlk->list, &pkt->handle->handle_blk_list);
     }
     //recycle struct MemPacket .
     list_add_tail(&pkt->list, &pkt->handle->handle_pkt_list);
     pthread_mutex_unlock(&pkt->handle->handle_mtx);
-
-EXIT:
 
     return 0;
 }
@@ -401,10 +427,12 @@ void mk_set_itor(struct MemPacket *pkt, struct MemItorVec *pItor)
         return ;
     }
 
+    memset(pItor, 0, sizeof(struct MemItorVec));
     pItor->plist = &pkt->blks_list; 
     pItor->blk_idx = 0;
     pItor->blk_num = pkt->blk_num;
 }
+
 
 /**
  *  mk_next_entry:   
@@ -414,7 +442,7 @@ void mk_set_itor(struct MemPacket *pkt, struct MemItorVec *pItor)
 */
 int mk_next_entry(struct MemItorVec *pItor, int *blk_len)
 {
-    unsigned char *ptr = NULL;
+    //unsigned char *ptr = NULL;
     struct list_head *plist = NULL;
     struct MemKitBlock *pblk = NULL;
 
@@ -425,14 +453,14 @@ int mk_next_entry(struct MemItorVec *pItor, int *blk_len)
     }
     if(pItor->blk_idx == pItor->blk_num)
     {
-        WARN("No free blocks to be Itor , blk num:%d!\n", pItor->blk_num);
+        //WARN("No free blocks to be Itor , blk num:%d!\n", pItor->blk_num);
         goto EXIT;
     }
     //
     plist = pItor->plist->next;
 
     pblk = list_entry(plist, struct MemKitBlock, list);
-    INFO("pblk:%p\n", pblk);
+    //INFO("pblk:%p\n", pblk);
     pItor->entry = pblk->blk_entry;
     pItor->blk_length = pblk->blk_length;
     *blk_len = pblk->blk_length;
