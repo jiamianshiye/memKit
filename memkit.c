@@ -28,7 +28,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
     if(list_empty(&handle->handle_blk_list))
     {
         ERROR("This handle have no left mem block!\n");
-        return ;
+        //return ;
     }
     else
     {
@@ -221,6 +221,7 @@ static int mk_magic_check(struct MemKitBlock *pBlk)
     {
         ERROR("Magic head have been damaged origin(0x%X), now(0x%X)\n", MEM_BLOCK_MAGIC_HEAD, pBlk->magic_head);
         ret = -1;
+        return ret;
     }
     
     pBlkTail = (struct MemKitTail *)((char *)pBlk->blk_entry + pBlk->blk_length);
@@ -232,6 +233,7 @@ static int mk_magic_check(struct MemKitBlock *pBlk)
 
     return ret;
 }
+
 
 /**
  *  mk_malloc: apply pakcet node and blocks. If size cannot be divisibled by mm_block_size, then used one more full block.
@@ -275,6 +277,12 @@ struct MemPacket * mk_malloc(struct MemKitHandle *handle, unsigned int size, cha
     }
 
     pthread_mutex_unlock(&handle->handle_mtx);
+    
+    if(pkt->magic_head != MEM_PACKET_MAGIC)
+    {
+        ERROR("Packet %p:%s have been damaged origin:(0x%X), now(0x%X)!\n", pkt, pkt->pkt_name, MEM_PACKET_MAGIC, pkt->magic_head);
+        return NULL;
+    }
 
     pkt->mem_refs = 1;
     pkt->handle = handle;
@@ -353,6 +361,12 @@ int mk_realloc(struct MemPacket *pkt ,int size)
     {
         pBlk = list_entry(pos, struct MemKitBlock, list); 
         list_del(&pBlk->list);
+        if(-1 == mk_magic_check(pBlk))
+        {
+            len = 0;
+            pthread_mutex_unlock(&handle->handle_mtx);
+            goto EXIT;
+        }
         list_add_tail(&pBlk->list, &pkt->blks_list);
         //INFO("addr for entry:%p!\n", pBlk->blk_entry);
         pBlk->blk_idx = pkt->blk_num;
@@ -390,10 +404,16 @@ int mk_free(struct MemPacket *pkt)
     //int ret = -1;
     struct list_head *pos, *next;
     struct MemKitBlock *pBlk = NULL;
+    int blk_num = 0;
     if(NULL == pkt)
     {
         WARN("Wrong params pkt:%p!\n", pkt);
         return -1;
+    }
+    if(pkt->magic_head != MEM_PACKET_MAGIC)
+    {
+        ERROR("Wrong magic head for this packet:%p, name:%s!!!\n", pkt, pkt->pkt_name);
+        exit(1);
     }
 
     //INFO("Recycle list pkt total_size:%d, name:%s!\n", pkt->total_size, pkt->pkt_name);
@@ -408,8 +428,14 @@ int mk_free(struct MemPacket *pkt)
             sleep(1);
             exit(1);
         }
+        blk_num++;
         list_del(&pBlk->list);
         list_add_tail(&pBlk->list, &pkt->handle->handle_blk_list);
+    }
+    if(blk_num != pkt->blk_num)
+    {
+        ERROR("Wrong, pkt block num (%d)not equal to calc num(%d) in blk_list!\n", pkt->blk_num, blk_num);
+        exit(1);
     }
     //recycle struct MemPacket .
     list_add_tail(&pkt->list, &pkt->handle->handle_pkt_list);
