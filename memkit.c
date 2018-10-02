@@ -25,6 +25,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
     int count = 0;
     struct list_head *pos, *next;
     //struct MemKitBlock *pBlk = NULL;
+    pthread_mutex_lock(&handle->handle_mtx);
     if(list_empty(&handle->handle_blk_list))
     {
         ERROR("This handle have no left mem block!\n");
@@ -58,6 +59,7 @@ void mk_print_handle_info(struct MemKitHandle *handle)
             count++;
         }
     }
+    pthread_mutex_unlock(&handle->handle_mtx);
     INFO("All packet count:%d, current count:%d\n", handle->handle_packets, count);
 
 EXIT:
@@ -219,7 +221,7 @@ static int mk_magic_check(struct MemKitBlock *pBlk)
 
     if(pBlk->magic_head != MEM_BLOCK_MAGIC_HEAD)
     {
-        ERROR("Magic head have been damaged origin(0x%X), now(0x%X)\n", MEM_BLOCK_MAGIC_HEAD, pBlk->magic_head);
+        ERROR("Magic head have been damaged origin(0x%X), now(0x%X), idx:%d, blk size:%d\n", MEM_BLOCK_MAGIC_HEAD, pBlk->magic_head, pBlk->blk_idx, pBlk->blk_length);
         ret = -1;
         return ret;
     }
@@ -335,7 +337,7 @@ int mk_realloc(struct MemPacket *pkt ,int size)
 
     if(pkt->magic_head != MEM_PACKET_MAGIC)
     {
-        ERROR("Wrong pkt magic:0x%x, handle:%p, mem_refs:%d!\n", pkt->magic_head, pkt->handle, pkt->mem_refs);
+        ERROR("Wrong pkt magic:0x%x, handle:%p, func %p!\n", pkt->magic_head, pkt->handle, __builtin_return_address(0));
         goto EXIT;
     }
 
@@ -363,6 +365,7 @@ int mk_realloc(struct MemPacket *pkt ,int size)
         list_del(&pBlk->list);
         if(-1 == mk_magic_check(pBlk))
         {
+            ERROR("Cannot malloc from block list!\n");
             len = 0;
             pthread_mutex_unlock(&handle->handle_mtx);
             goto EXIT;
@@ -412,7 +415,7 @@ int mk_free(struct MemPacket *pkt)
     }
     if(pkt->magic_head != MEM_PACKET_MAGIC)
     {
-        ERROR("Wrong magic head for this packet:%p, name:%s!!!\n", pkt, pkt->pkt_name);
+        ERROR("Wrong magic head for this packet:%p, name:%s, func %p!!!\n", pkt, pkt->pkt_name, __builtin_return_address(0));
         exit(1);
     }
 
@@ -424,7 +427,7 @@ int mk_free(struct MemPacket *pkt)
         pBlk = list_entry(pos, struct MemKitBlock, list);
         if(0 != mk_magic_check(pBlk))
         {
-            ERROR("block damaged name:%s\n", pkt->pkt_name);
+            ERROR("block damaged name:%s, func %p\n", pkt->pkt_name, __builtin_return_address(0));
             sleep(1);
             exit(1);
         }
@@ -486,6 +489,12 @@ int mk_next_entry(struct MemItorVec *pItor, int *blk_len)
     plist = pItor->plist->next;
 
     pblk = list_entry(plist, struct MemKitBlock, list);
+    if(0 != mk_magic_check(pblk))
+    {
+        ERROR("block damaged idx:%d, func %p\n", pblk->blk_idx, __builtin_return_address(0));
+        sleep(1);
+        exit(1);
+    }
     //INFO("pblk:%p\n", pblk);
     pItor->entry = pblk->blk_entry;
     pItor->blk_length = pblk->blk_length;
