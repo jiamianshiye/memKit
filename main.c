@@ -55,10 +55,10 @@ void *thread_consumer(void *arg)
 int main(int argc, char *argv[])
 {
     struct MemKitHandle hdl;
-    int block_len;
+    unsigned int block_len;
     char *ptr = NULL;
     char *raw = NULL;
-    int i = 0;
+    unsigned int i = 0;
     int ret = 0;
     struct MemItorVec itor;
     pthread_t pid;
@@ -81,9 +81,9 @@ int main(int argc, char *argv[])
 
     ret = pthread_create(&pid, NULL, thread_consumer, NULL);
 
-    int datalen = 0;
+    unsigned int datalen = 0;
     char *entry = NULL;
-    int thislen;
+    unsigned int thislen;
     while(1)
     {
         datalen = rand() % (MEM_BLOCK_LEN * 2);
